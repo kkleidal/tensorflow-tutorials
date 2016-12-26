@@ -31,9 +31,6 @@ def main(alpha=0.9):
                 graph.labels: labels,
                 graph.dropout_keep_prob: 0.8,
             })
-        # Test error:
-        test_acc = accuracy(sess, graph, mnist.test.images, mnist.test.labels)
-        print("Test accuracy: %.4f" % test_acc)
 
 if __name__ == "__main__":
     main()
