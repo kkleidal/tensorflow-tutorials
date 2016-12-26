@@ -1,7 +1,9 @@
-import numpy as np
+import os
 import tensorflow as tf
-from tensorflow.examples.tutorials.mnist import input_data
 from utils import *
+
+SAVED_MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "model")
+SAVED_MODEL_PATH = os.path.join(SAVED_MODEL_DIR, "model.cpkt")
 
 class GraphConfig:
     learning_rate = 0.002
@@ -137,29 +139,3 @@ def accuracy(sess, graph, images, labels):
         })
         i += 1
     return total_correct / float(len(labels))
-
-
-def main(alpha=0.9):
-    graph = build_graph(GraphConfig()) 
-    mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
-    batch_size = 50
-    with tf.Session() as sess:
-        summary_writer = tf.summary.FileWriter('tflog', sess.graph)
-        sess.run(tf.global_variables_initializer())
-        for i in xrange(20000):
-            inputs, labels = mnist.train.next_batch(batch_size)
-            if i % 100 == 0:
-                # Train error:
-                train_acc = accuracy(sess, graph, inputs, labels)
-                print("Batch %6d train accuracy: %.4f" % (i, train_acc))
-            # Train on the batch:
-            sess.run(graph.train, feed_dict={
-                graph.inputs: inputs,
-                graph.labels: labels,
-                graph.dropout_keep_prob: 0.8,
-            })
-        # Test error:
-        test_acc = accuracy(sess, graph, mnist.test.images, mnist.test.labels)
-        print("Test accuracy: %.4f" % test_acc)
-if __name__ == "__main__":
-    main()
