@@ -70,6 +70,12 @@ def conv1_layer(input_to_layer, name='conv1-layer'):
             out = tf.nn.relu(preactivation)
     return out
 
+def pool1_layer(input_to_layer, name='pool1-layer'):
+    return tf.nn.max_pool(input_to_layer, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
+
+def flatten(inp):
+    return tf.reshape(inp, [tf.shape(inp)[0], reduce(lambda x, y: int(x)*int(y), inp.get_shape()[1:], 1)])
+
 def softmax_layer(input_to_layer, name='softmax-layer'):
     with tf.variable_scope(name, values=[input_to_layer]):
         with tf.name_scope('weights'):
@@ -86,15 +92,17 @@ def softmax_layer(input_to_layer, name='softmax-layer'):
                 prediction = tf.argmax(logits, 1)
     return logits, proba, prediction
 
-def flatten(inp):
-    return tf.reshape(inp, [tf.shape(inp)[0], reduce(lambda x, y: int(x)*int(y), inp.get_shape()[1:], 1)])
+def stack_layers(layers):
+    def run_network(inp):
+        state = inp
+        for layer in layers:
+            state = layer(state)
+        return state
+    return run_network
 
 def forward_propagation(images, labels):
-    conv1 = conv1_layer(images)
-
-    flattened = flatten(conv1)
-
-    logits, proba, prediction = softmax_layer(flattened)
+    network = stack_layers([flatten, softmax_layer]) #[conv1_layer, pool1_layer, flatten, softmax_layer])
+    logits, proba, prediction = network(images)
 
     with tf.name_scope('accuracy'):
         with tf.name_scope('accuracy'):
