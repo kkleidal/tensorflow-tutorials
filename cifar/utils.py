@@ -12,10 +12,12 @@ def variable_summaries(var):
         yield tf.summary.scalar('min', tf.reduce_min(var))
         yield tf.summary.histogram('histogram', var)
 
-def weight_variable(dims):
+def weight_variable(dims, stddev=0.1):
     with tf.device("/cpu:0"):
-        return tf.Variable(tf.truncated_normal(dims, stddev=0.1), name="weights")
+        var = tf.get_variable("weights", dims, initializer=tf.truncated_normal_initializer(stddev=stddev, dtype=tf.float32))
+    return var
 
-def bias_variable(dim):
+def bias_variable(dim, const=0.1):
     with tf.device("/cpu:0"):
-        return tf.Variable(tf.constant(0.1, shape=[dim]), name="bias")
+        var = tf.get_variable("bias", [dim], initializer=tf.constant_initializer(const, dtype=tf.float32))
+    return var

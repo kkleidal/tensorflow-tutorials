@@ -39,23 +39,45 @@ def training_input_graph(batch_size=100):
             # The examples and labels for training a single batch
             return image_batch, label_batch
 
-def train_graph(image_batch, label_batch):
-    labels = tf.squeeze(label_batch, axis=1)
-    input_layer = tf.cast(tf.reshape(image_batch, [tf.shape(image_batch)[0], 3 * 32 * 32]), tf.float32)
-
-    with tf.name_scope('class-output'):
+def conv1_layer(input_to_layer, name='conv1-layer'):
+    with tf.variable_scope(name, values=[input_to_layer]):
         with tf.name_scope('weights'):
-            weights = weight_variable([3 * 32 * 32, 10])
+            weights = weight_variable([5, 5, 3, 64], stddev=5e-2)
+        with tf.name_scope('biases'):
+            bias = bias_variable(64)
+        with tf.name_scope('preactivation'):
+            conv = tf.nn.conv2d(input_to_layer, weights, [1, 1, 1, 1], padding='SAME')
+            preactivation = tf.nn.bias_add(conv, bias)
+        with tf.name_scope('output'):
+            out = tf.nn.relu(preactivation)
+    return out
+
+def softmax_layer(input_to_layer, name='softmax-layer'):
+    with tf.variable_scope(name, values=[input_to_layer]):
+        with tf.name_scope('weights'):
+            weights = weight_variable([input_to_layer.get_shape()[1], 10])
         with tf.name_scope('biases'):
             bias = bias_variable(10)
-        with tf.name_scope('activation'):
-            activation = tf.matmul(input_layer, weights) + bias
-            logits = activation
+        with tf.name_scope('preactivation'):
+            preactivation = tf.matmul(input_to_layer, weights) + bias
+            logits = preactivation
         with tf.name_scope('output'):
             with tf.name_scope('probabilities'):
                 proba = tf.nn.softmax(logits)
             with tf.name_scope('predictions'):
-                prediction = tf.argmax(proba, 1)
+                prediction = tf.argmax(logits, 1)
+    return logits, proba, prediction
+
+def forward_propagation(image_batch, label_batch):
+    images = tf.transpose(tf.cast(image_batch, tf.float32), [0, 2, 3, 1])
+    tf.summary.image("image", images, max_outputs=3)
+    labels = tf.squeeze(label_batch, axis=1)
+
+    conv1 = conv1_layer(images)
+
+    flattened = tf.reshape(conv1, [tf.shape(conv1)[0], 32 * 32 * 64])
+
+    logits, proba, prediction = softmax_layer(flattened)
 
     with tf.name_scope('accuracy'):
         with tf.name_scope('accuracy'):
@@ -65,43 +87,54 @@ def train_graph(image_batch, label_batch):
 
     with tf.name_scope('loss'):
         labels_one_hot = tf.one_hot(labels, 10, on_value=1.0, off_value=0.0)
-        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits, labels_one_hot))
+        loss = tf.nn.softmax_cross_entropy_with_logits(logits, labels_one_hot)
+        batch_loss = tf.reduce_mean(loss)
 
-    train = tf.train.AdamOptimizer(0.01).minimize(loss, name="train")
-    return train, correct, loss 
+    return correct, batch_loss
 
-def main():
-    image_batch, label_batch = training_input_graph()
-    train, correct, loss = train_graph(image_batch, label_batch)
-    saver = tf.train.Saver()  # For saving the model
-    with tf.Session() as sess:
-        summary_writer = tf.summary.FileWriter('tflog', sess.graph)  # For logging for TensorBoard
+def main(batch_size=2):
+    with tf.device("/cpu:0"):
+        # Build graph:
+        opt = tf.train.GradientDescentOptimizer(0.01)
+        image_batch, label_batch = training_input_graph(batch_size=batch_size)
+        with tf.device("/cpu:0"):
+            correct, loss = forward_propagation(image_batch, label_batch)
+            grads = opt.compute_gradients(loss)
+        train = opt.apply_gradients(grads)
+        summaries = tf.summary.merge_all()
 
-        # Initialize the variables (like the epoch counter).
-        with tf.device("/cpu:0"): # Initialize variables on the main cpu
-            sess.run(tf.global_variables_initializer())
+        # Train:
+        saver = tf.train.Saver()  # For saving the model
+        with tf.Session(config=tf.ConfigProto(
+                log_device_placement=True)) as sess:
+            summary_writer = tf.summary.FileWriter('tflog', sess.graph)  # For logging for TensorBoard
 
-        # Start input enqueue threads.
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+            # Initialize the variables (like the epoch counter).
+            with tf.device("/cpu:0"): # Initialize variables on the main cpu
+                sess.run(tf.global_variables_initializer())
 
-        try:
-            i = 0
-            while not coord.should_stop():
-                _, num_correct, batch_loss = sess.run([train, correct, loss])
-                print "Iteration %d. Acc %.3f. Loss %.2f" % (i, num_correct / 100.0, batch_loss)
-                i += 1
-                # Checkpoint, save the model:
-                saver.save(sess, SAVED_MODEL_PATH, global_step=(i+1))
+            # Start input enqueue threads.
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-        except tf.errors.OutOfRangeError:
-            print('Done training -- epoch limit reached')
-        finally:
-            # When done, ask the threads to stop.
-            coord.request_stop()
+            try:
+                i = 0
+                while not coord.should_stop():
+                    _, num_correct, batch_loss, summary = sess.run([train, correct, loss, summaries])
+                    print("Iteration %d. Acc %.3f. Loss %.2f" % (i, num_correct / batch_size, batch_loss))
+                    i += 1
+                    # Checkpoint, save the model:
+                    saver.save(sess, SAVED_MODEL_PATH, global_step=(i+1))
+                    summary_writer.add_summary(summary)
 
-        # Wait for threads to finish.
-        coord.join(threads)
-        sess.close()
+            except tf.errors.OutOfRangeError:
+                print('Done training -- epoch limit reached')
+            finally:
+                # When done, ask the threads to stop.
+                coord.request_stop()
+
+            # Wait for threads to finish.
+            coord.join(threads)
+            sess.close()
 
 main()
