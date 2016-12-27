@@ -1,12 +1,27 @@
 import os
 import tensorflow as tf
 from utils import *
+from functools import reduce
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 SAVED_MODEL_PATH = os.path.join(DIR, "model", "model.ckpt")
 
 # Flip image/distort/etc
-def processing(image):
+def image_processing(image, train=True, brightness_distortion=63, contrast_distortion_lower=0.2, contrast_distortion_upper=1.8):
+    # Cropping
+    if train:
+        image = tf.random_crop(image, [24, 24, 3])
+        # Flipping
+        image = tf.image.random_flip_left_right(image)
+        # Brightness distortion
+        image = tf.image.random_brightness(image, brightness_distortion)
+        # Brightness distortion
+        image = tf.image.random_contrast(image, contrast_distortion_lower, contrast_distortion_upper)
+    else:
+        image = tf.image.resize_image_with_crop_or_pad(image, 24, 24)
+    # Whitening
+    image = tf.image.per_image_standardization(image)
+    image.set_shape([24, 24, 3])
     return image
 
 # Graph ops for loading, parsing, and queuing training images 
@@ -28,7 +43,8 @@ def training_input_graph(batch_size=100):
                           [3, 32, 32])
         with tf.name_scope("processing"):
             # flipping/etc
-            image = processing(record_input)
+            image = (tf.cast(tf.transpose(record_input, [1, 2, 0]), tf.float32) - 128.0) / 256.0
+            image = image_processing(image, train=True)
         with tf.name_scope("batching"):
             # Load 10000 images to start, then continue enqueuing up to capacity
             min_after_dequeue = 10000
@@ -37,7 +53,9 @@ def training_input_graph(batch_size=100):
                 [image, record_label], batch_size=batch_size, capacity=capacity,
                 min_after_dequeue=min_after_dequeue)
             # The examples and labels for training a single batch
-            return image_batch, label_batch
+            tf.summary.image("image", image_batch, max_outputs=3)
+            labels = tf.squeeze(label_batch, axis=1)
+            return image_batch, labels
 
 def conv1_layer(input_to_layer, name='conv1-layer'):
     with tf.variable_scope(name, values=[input_to_layer]):
@@ -68,14 +86,13 @@ def softmax_layer(input_to_layer, name='softmax-layer'):
                 prediction = tf.argmax(logits, 1)
     return logits, proba, prediction
 
-def forward_propagation(image_batch, label_batch):
-    images = tf.transpose(tf.cast(image_batch, tf.float32), [0, 2, 3, 1])
-    tf.summary.image("image", images, max_outputs=3)
-    labels = tf.squeeze(label_batch, axis=1)
+def flatten(inp):
+    return tf.reshape(inp, [tf.shape(inp)[0], reduce(lambda x, y: int(x)*int(y), inp.get_shape()[1:], 1)])
 
+def forward_propagation(images, labels):
     conv1 = conv1_layer(images)
 
-    flattened = tf.reshape(conv1, [tf.shape(conv1)[0], 32 * 32 * 64])
+    flattened = flatten(conv1)
 
     logits, proba, prediction = softmax_layer(flattened)
 
