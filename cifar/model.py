@@ -7,7 +7,7 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 SAVED_MODEL_DIR = os.path.join(DIR, "model")
 SAVED_MODEL_PATH = os.path.join(SAVED_MODEL_DIR, "model.ckpt")
 
-def forward_propagation(images, labels):
+def forward_propagation(images, labels, train=False):
     network = stack_layers([
         conv_layer(name="conv1-layer"),
         pool_layer(name="pool1-layer"),
@@ -17,7 +17,7 @@ def forward_propagation(images, labels):
         pool_layer(name="pool2-layer"),
         flatten(),
         fully_connected_layer(384, name="local1-layer"),
-        fully_connected_layer(192, keep_prob=0.5, name="local2-layer"),
+        fully_connected_layer(192, keep_prob=0.5 if train else 1.0, name="local2-layer"),
         softmax_layer(10)
     ])
     logits, proba, prediction = network(images)

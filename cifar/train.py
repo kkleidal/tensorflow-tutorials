@@ -10,7 +10,7 @@ def main(batch_size=100):
         opt = tf.train.AdamOptimizer(0.01)
         image_batch, label_batch = input_graph(training=True, batch_size=batch_size)
         with tf.device("/cpu:0"): # Potentially gpu
-            correct, loss = forward_propagation(image_batch, label_batch)
+            correct, loss = forward_propagation(image_batch, label_batch, train=True)
             grads = opt.compute_gradients(loss)
         train = opt.apply_gradients(grads)
         summaries = tf.summary.merge_all()
