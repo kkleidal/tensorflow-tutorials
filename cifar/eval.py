@@ -38,7 +38,6 @@ def evaluate(partition="train", batch_size=100):
                         # summary_writer.add_summary(summary)
                     total = i * batch_size
                     acc = num_correct / float(total)
-                    print("Accuracy: %.3f" % (100.0 * acc))
                 except tf.errors.OutOfRangeError:
                     print('Done training -- epoch limit reached')
                 finally:
