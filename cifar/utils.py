@@ -12,9 +12,12 @@ def variable_summaries(var):
         yield tf.summary.scalar('min', tf.reduce_min(var))
         yield tf.summary.histogram('histogram', var)
 
-def weight_variable(dims, stddev=0.1):
+def weight_variable(dims, stddev=0.1, wd=None):
     with tf.device("/cpu:0"):
         var = tf.get_variable("weights", dims, initializer=tf.truncated_normal_initializer(stddev=stddev, dtype=tf.float32))
+        if wd is not None:
+            weight_decay = tf.mul(tf.nn.l2_loss(var), wd, name='weight_loss')
+            tf.add_to_collection('losses', weight_decay)
     return var
 
 def bias_variable(dim, const=0.1):
