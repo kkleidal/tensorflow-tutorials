@@ -6,7 +6,7 @@ from data import *
 
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1 # Initial learning rate.
-NUM_EPOCHS_PER_DECAY = 350.0 # Epochs after which learning rate decays.
+NUM_EPOCHS_PER_DECAY = 50.0 # 350.0 # Epochs after which learning rate decays.
 def optimizer(num_batches_per_epoch):
     global_step = tf.Variable(initial_value=0, trainable=False)
     increment_step = global_step.assign_add(1)
@@ -16,8 +16,7 @@ def optimizer(num_batches_per_epoch):
                                     decay_steps,
                                     LEARNING_RATE_DECAY_FACTOR,
                                     staircase=True) 
-    #initial * (1.0 + alpha)**(-beta * tf.cast(global_step, tf.float32))
-    opt = tf.train.AdamOptimizer(lr)
+    opt = tf.train.GradientDescentOptimizer(lr)
     return increment_step, opt, lr, global_step
 
 def main(restore_if_possible=True, batch_size=128):
