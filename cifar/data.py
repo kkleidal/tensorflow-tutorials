@@ -7,6 +7,7 @@ IMAGE_SIZE = 24
 NUM_CLASSES = 10
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 50000
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 10000
+NUM_EXAMPLES_PER_EPOCH_FOR_CAT = 1
 
 # Flip image/distort/etc
 def _image_processing(image, train=True, brightness_distortion=63, contrast_distortion_lower=0.2, contrast_distortion_upper=1.8):
@@ -36,6 +37,9 @@ def input_graph(training=True, partition='test', batch_size=100):
         elif partition == 'test':
             filenames = [os.path.join(DIR, "cifar-10-batches-bin", 'test_batch.bin')]
             num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
+        elif partition == 'cat':
+            filenames = [os.path.join(DIR, "cat", 'cat-small.bin')]
+            num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_CAT
         else:
             assert(False)
         filename_queue = tf.train.string_input_producer(filenames)
@@ -71,4 +75,4 @@ def input_graph(training=True, partition='test', batch_size=100):
             # The examples and labels for training a single batch
             tf.summary.image("image", image_batch, max_outputs=3)
             labels = tf.squeeze(label_batch, axis=1)
-            return image_batch, labels
+            return image_batch, labels, num_examples_per_epoch

@@ -35,4 +35,4 @@ def forward_propagation(images, labels, dropout=False, train=False):
         tf.add_to_collection('losses', batch_loss)
         total_loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
-    return correct, total_loss
+    return correct, total_loss, proba

@@ -9,9 +9,12 @@ def evaluate(partition="train", batch_size=100):
     with g.as_default():
         with tf.device("/cpu:0"):
             # Build graph:
-            image_batch, label_batch = input_graph(training=False, partition=partition, batch_size=batch_size)
+            image_batch, label_batch, num_examples_per_epoch = input_graph(training=False, partition=partition, batch_size=batch_size)
+            img = tf.summary.image("image", image_batch, 1)
             with tf.device("/cpu:0"): # Potentially gpu
-                correct, loss = forward_propagation(image_batch, label_batch)
+                correct, loss, proba = forward_propagation(image_batch, label_batch)
+            proba_summary = tf.summary.tensor_summary("proba", proba)
+            summaries = tf.summary.merge([img, proba_summary])
 
             restorer = tf.train.Saver()  # For saving the model
             acc = 0.0
@@ -22,7 +25,8 @@ def evaluate(partition="train", batch_size=100):
                     sess.run(tf.global_variables_initializer())
                 restorer.restore(sess, tf.train.latest_checkpoint(SAVED_MODEL_DIR))
 
-                summary_writer = tf.summary.FileWriter('tflog-eval', sess.graph)  # For logging for TensorBoard
+                if partition == "cat":
+                    summary_writer = tf.summary.FileWriter('tflog-eval', sess.graph)  # For logging for TensorBoard
 
                 # Start input enqueue threads.
                 coord = tf.train.Coordinator()
@@ -31,11 +35,18 @@ def evaluate(partition="train", batch_size=100):
                 try:
                     i = 0
                     num_correct = 0
-                    while i * batch_size < NUM_EXAMPLES_PER_EPOCH_FOR_EVAL \
+                    while i * batch_size < num_examples_per_epoch \
                             and not coord.should_stop():
-                        num_correct += sess.run(correct)
+                        if partition == "cat":
+                            current_correct, summary, pr = sess.run([correct, summaries, proba])
+                            classes = ("airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck")
+                            for cls, prb in zip(classes, pr[0,:].tolist()):
+                                print "%s: %6.2f%%" % (cls, prb * 100.0)
+                            summary_writer.add_summary(summary)
+                        else:
+                            current_correct = sess.run(correct)
+                        num_correct += current_correct
                         i += 1
-                        # summary_writer.add_summary(summary)
                     total = i * batch_size
                     acc = num_correct / float(total)
                 except tf.errors.OutOfRangeError:
@@ -50,6 +61,8 @@ def evaluate(partition="train", batch_size=100):
             return acc
 
 def main(batch_size=100):
+    test_acc = evaluate(partition="cat")
+    print("Cat accuracy: %.3f" % (100.0 * test_acc))
     train_acc = evaluate(partition="train")
     print("Training accuracy: %.3f" % (100.0 * train_acc))
     test_acc = evaluate(partition="test")
