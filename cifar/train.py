@@ -19,13 +19,13 @@ def optimizer(num_batches_per_epoch):
     opt = tf.train.GradientDescentOptimizer(lr)
     return increment_step, opt, lr, global_step
 
-def main(restore_if_possible=True, batch_size=128):
+def main(use_gpu=True, restore_if_possible=True, batch_size=128):
     with tf.device("/cpu:0"):
         # Build graph:
         image_batch, label_batch, num_examples_per_epoch = input_graph(training=True, batch_size=batch_size)
         num_batches_per_epoch = num_examples_per_epoch / batch_size
         increment_step, opt, lr, step = optimizer(num_batches_per_epoch)
-        with tf.device("/cpu:0"): # Potentially gpu
+        with tf.device("/gpu:0" if use_gpu else "/cpu:0"):
             correct, loss, _ = forward_propagation(image_batch, label_batch, train=True)
             grads = opt.compute_gradients(loss)
         with tf.control_dependencies([opt.apply_gradients(grads), increment_step]):
