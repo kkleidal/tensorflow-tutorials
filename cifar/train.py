@@ -23,7 +23,7 @@ def main(use_gpu=True, restore_if_possible=True, batch_size=128):
     with tf.device("/cpu:0"):
         # Build graph:
         image_batch, label_batch, num_examples_per_epoch = input_graph(training=True, batch_size=batch_size)
-        num_batches_per_epoch = num_examples_per_epoch / batch_size
+        num_batches_per_epoch = num_examples_per_epoch // batch_size
         increment_step, opt, lr, step = optimizer(num_batches_per_epoch)
         with tf.device("/gpu:0" if use_gpu else "/cpu:0"):
             correct, loss, _ = forward_propagation(image_batch, label_batch, train=True)
@@ -60,6 +60,7 @@ def main(use_gpu=True, restore_if_possible=True, batch_size=128):
                         # Checkpoint, save the model:
                         summary = sess.run(summaries)
                         summary_writer.add_summary(summary)
+                        print("Saving to %s" % SAVED_MODEL_PATH)
                         saver.save(sess, SAVED_MODEL_PATH, global_step=i)
 
             except tf.errors.OutOfRangeError:
